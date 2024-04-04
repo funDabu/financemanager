@@ -23,7 +23,7 @@ the csv file should look similar to this:
 ```
 "date","counterpart name","IBAN","BIC","counterpart account","counterpart bank code","amount","currency","message","transaction ID","owner name","owner account number"
 "10.04.2024","Restaurant","","","","0","-300,75","USD","Repayment for dinner","GHI123JKL","John Doe","567890/1234"
-"09.04.2024","XYZ Corporation","FR1420041010050500013M02606","PSSTFRPPMAR","13M026/7890","7890","-2 500,00","USD","Monthly lease payment","MNO456PQR","John
+"09.04.2024","XYZ Corporation","FR1420041010050500013M02606","PSSTFRPPMAR","13M026/7890","7890","-2 500,00","USD","Monthly lease payment","MNO456PQR","John Doe","567890/1234"
 "08.04.2024","Alice Johnson","DE89370400440532013000","COBADEFFXXX","","0","1 000,00","USD","Salary payment","STU789VWX","John Doe","567890/1234"
 ...
 ```
