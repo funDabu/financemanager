@@ -1,0 +1,218 @@
+@using FinanceManager.Configuration
+@using System.Drawing
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<AlertComponent @ref="Alert"/>
+<br/><br/>
+@* save button *@
+@if (_filters.Count > 0)
+{
+  <div>
+    <button class="btn-primary" @onclick="RemoveFiltered">Remove filtered transactions</button>
+  </div>
+}
+
+@* display filter components *@
+<div>
+  @foreach (var (column, filter) in _filters)
+  {
+    <div>
+      <GridFilterComponent Alert="Alert"
+                           OnApplyChange="FilterChangeHandler"
+                           Filter="filter"
+                           Caption=@($"Filter {column}: ")/>
+      <button @onclick="() => RemoveFilter(filter.Id)"> Remove </button>
+    </div>
+  }
+</div>
+
+@* add new filter *@
+<div>
+  New filter:
+  <InputSelect TValue="string" @bind-Value="@_newFilterColumn">
+    @foreach (var column in Data!.TransactionType.EntryNames)
+    {
+      <option value="@column">@column</option>
+    }
+  </InputSelect>
+  <button @onclick="() => AddFilter(_newFilterColumn)">Add</button>
+</div>
+
+@* toggle hidden components  *@
+<div>
+  <span>Hidden columns:</span>
+   @foreach (var column in HiddenColumnNames)
+  {
+    <span>
+      @column
+      <span class="toggle-column" @onclick="() => HideColumn(column)">&#10010;</span>,
+    </span>
+  }
+
+</div>
+
+@* display sorted by *@
+<div>
+  <span>Sorted by: </span>
+  @foreach (var column in Config.Comparator.SortedOn)
+  {
+    <span>@column <span class="@GetSortingClass(column)" style="position: static"></span>,</span>
+  }
+</div>
+
+<br/><br/>
+
+@* data grid *@
+<div style="overflow: auto; max-width: 80vw; max-height: 70vh">
+  <table class="table table-hover w-auto">
+    <thead class="sticky-top bg-white">
+    <tr>
+      @foreach (var column in DisplayedColumnNames)
+      {
+        <th scope="col" class="@Config.GetAlignmentClass(column)" style="position: relative; padding-left: 20px">
+          <span class="toggle-column"
+                @onclick="() => HideColumn(column)">&#10006;</span>
+          @Config.GetColumn(column).Caption
+          <span class="@GetSortingClass(column)"
+                @onclick="() => SortClick(column)">
+          </span>
+        </th>
+      }
+    </tr>
+    </thead>
+    <tbody >
+    @foreach (var transaction in FilteredData.OrderBy(t => t, Config.Comparator)
+                
+                .Skip(Config.Paging.NumEntriesToSkip())
+                .Take(Config.Paging.NumEntriesToTake()))
+    {
+      <tr>
+        @foreach (var (column, entry) in DisplayedColumnNames.Zip(transaction.GetEntries(DisplayedColumnNames)))
+        {
+          <td class="@Config.GetAlignmentClass(column)">
+            <input @bind:get="entry.ValueString"
+                   @bind:set="(value) => SetEntry(entry,value)" 
+                   class="@Config.GetAlignmentClass(column)"
+                   size="@Math.Max(2, Math.Min(20, entry.ValueString.Length))"/>
+          </td>
+        }
+      </tr>
+    }
+    </tbody>
+  </table>
+</div>
+
+@* pagination *@
+<PagingComponent PagingConfig="Config.Paging"
+                 OnPageChange="StateHasChanged"/>
+
+@code {
+  
+  /// <summary> Data the grid component is working with </summary>
+  [Parameter] [EditorRequired] 
+  public ITransactionData Data { get; set; } = default!;
+
+  /// <summary> Data grid configuration </summary>
+  [Parameter]
+  public DataGridConfig? Config { get; set; }
+  
+  /// <summary> Filtered data </summary>
+  public IEnumerable<ITransaction> FilteredData => Data.Where(Config.TransactionFilter);
+
+  private AlertComponent Alert;
+
+  private static int _counter = 0;
+
+  private List<Tuple<string,TransactionEntryFilter>> _filters = new();
+
+  private string? _newFilterColumn;
+
+  protected override void OnParametersSet()
+  {
+    base.OnParametersSet();
+    
+    Config ??= new DataGridConfig(Data.TransactionType);
+    Config.Paging.DataLength = Data.Length;
+  }
+
+  private void FilterChangeHandler()
+  {
+    Config.Paging.DataLength = FilteredData.Count();
+    StateHasChanged();
+  }
+
+  private IEnumerable<string> DisplayedColumnNames => Data.TransactionType.EntryNames.Where(Config.GetColumnDisplayed);
+
+  private IEnumerable<string> HiddenColumnNames =>
+    Data!.TransactionType.EntryNames.Where(c => !Config.GetColumnDisplayed(c));
+
+  private string GetEntry(ITransaction transaction, ColumnDefinition column)
+  {
+    if (!transaction.TryGetEntry(column.ColumnName, out var entry))
+    {
+      throw new Exception($"{nameof(GetEntry)}: the column '{column}' not found in given transaction");
+    }
+
+    return entry.ValueString;
+  }
+
+  private void SetEntry(ITransactionEntry entry, string newValue)
+  {
+    if (!entry.TrySetValue(newValue, out var validationMessage))
+    {
+      Alert.DisplayAlertAsync(validationMessage, 10);
+    }
+  }
+
+  private string GetSortingClass(string columnName)
+  {
+    return Config.GetColumnDirection(columnName) switch
+    {
+      SortDirection.Ascending => "sort up",
+      SortDirection.Descending => "sort down",
+      SortDirection.NoSort => "sort no-sort",
+      _ => throw new ArgumentOutOfRangeException(nameof(columnName))
+    };
+  }
+
+  private void SortClick(string columnName)
+  {
+    Config.ToggleSort(columnName);
+    StateHasChanged();
+  }
+
+  private void HideColumn(string columnName)
+  {
+    Config.ToggleColumnDisplayed(columnName);
+    StateHasChanged();
+  }
+
+  private void AddFilter(string? column)
+  {
+    if (column == null)
+    {
+      return;
+    }
+    
+    var id = _counter++;
+    var filter = new TransactionEntryFilter(id, Config.GetColumn(column).DataValueType);
+
+    _filters.Add(new Tuple<string, TransactionEntryFilter>(column, filter));
+    Config.AddFilter(column, filter);
+    StateHasChanged();
+  }
+
+  private void RemoveFilter(long id)
+  {
+    _filters.RemoveAll(f => f.Item2.Id == id);
+    Config.RemoveFilter(id);
+    StateHasChanged();
+  }
+  
+  private void RemoveFiltered()
+  {
+    Data.Filter(Config.TransactionFilter);
+  }
+
+}
+

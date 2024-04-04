@@ -1,0 +1,72 @@
+@page "/load"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using FinanceManager.Services
+@inject ITransactionDataStorage DataStorage
+
+<h3>Load new file</h3>
+
+<ul>
+    @if (_errors.Count > 0)
+    {
+        <h3>Parse error:</h3>
+    }
+    @foreach (var error in _errors)
+    {
+        <li style="color: red"> @error </li>
+    }
+</ul>
+
+<InputFile OnChange="@LoadFile"></InputFile>
+
+@if (savedFile != null)
+{
+    <div>
+         &#10004; File  <span class="fst-italic">@savedFile</span> was successfully stored. 
+    </div>
+}
+
+
+@code {
+    private const long MaxSize = 1024 * 512; // 512 KB
+    private readonly List<string> _errors = new();
+    private string? savedFile;
+
+    private async Task LoadFile(InputFileChangeEventArgs e)
+    {
+        _errors.Clear();
+        if (e.FileCount > 1)
+        {
+            _errors.Add($"Too many files was chosen. Only one file can be selected");
+        }
+
+        var file = e.File;
+        if (file.Size > MaxSize)
+        {
+            _errors.Add($"Too large file was chosen. Maximal file size is {MaxSize}");
+        }
+
+        // await using var fileStream = file.OpenReadStream(MaxSize);
+        // file.OpenReadStream() does not support synchronous read which is required for parsing
+        using var fileStream = new MemoryStream();
+        await file.OpenReadStream().CopyToAsync(fileStream);
+        fileStream.Position = 0;
+        
+        var transactionData = new TransactionDataParser().ParseCsv(fileStream, out var errorMessage);
+        if (errorMessage == null)
+        {
+            if (DataStorage.TryAdd(file.Name, transactionData))
+            {
+                savedFile = file.Name;
+            }
+            else
+            {
+                _errors.Add($"File with name '{file.Name}' already exists");
+            }
+        }
+        else
+        {
+            _errors.Add(errorMessage);
+        }
+    }
+}
+    

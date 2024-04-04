@@ -1,0 +1,60 @@
+@using System.ComponentModel.DataAnnotations
+@using FinanceManager.Configuration
+
+
+<nav aria-label="Data grid page navigation">
+  <ul class="pagination justify-content-end" style="margin-bottom: 0">
+    <li class="page-item">
+      <button class="page-link" @onclick="GoToPrev">Previous</button>
+    </li>
+    <li class="page-item">
+      <label class="page-link">
+        <input size="3" 
+               @bind:get="PagingConfig.CurrentPage"
+               @bind:set="value => { PagingConfig.CurrentPage = value; OnPageChange(); }"/>
+        of @PagingConfig.MaxPageNumber
+      </label>
+    </li>
+    <li class="page-item">
+      <button class="page-link" @onclick="GoToNext">Next</button>
+    </li>
+  </ul>
+  <ul class="pagination justify-content-end">
+      <li class="page-item">
+        <label class="page-link">
+          Page size:
+          <input @bind:get="PagingConfig.PageSize" 
+                 @bind:set="value => { PagingConfig.PageSize = value; OnPageChange(); }"
+                 size="4"/>
+        </label>
+      </li>
+    </ul>
+</nav>
+
+
+
+@code {
+  /// <summary>Configuration of the component</summary>
+  [Parameter] [EditorRequired]
+  public PagingConfig PagingConfig { get; set; }
+
+  /// <summary><c>Action</c> delegate called when page is changed. </summary>
+  [Parameter] [EditorRequired]
+    public Action OnPageChange { get; set; }
+  
+  
+  private void GoToPrev()
+  {
+    PagingConfig.CurrentPage--;
+    OnPageChange();
+  }
+
+  private void GoToNext()
+  {
+    PagingConfig.CurrentPage++;
+    OnPageChange();
+  }
+  
+  
+    
+}

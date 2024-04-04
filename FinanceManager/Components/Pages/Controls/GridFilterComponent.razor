@@ -1,0 +1,151 @@
+@using System.Text.RegularExpressions
+@using FinanceManager.Configuration
+
+@rendermode InteractiveServer
+
+
+<span>@Caption: </span>
+
+<InputSelect TValue="string" @bind-Value="@CompareSign">
+    @foreach (var sign in CompareSigns)
+    {
+        <option value="@sign">@sign</option>
+    }
+</InputSelect>
+
+@* debug *@
+<span> @Filter.ValueType.ToString() </span>
+
+@switch (Filter.ValueType)
+{
+    case EntryValueType.Date:
+        <input type="date" @bind="FilterDateValue"/>
+        break;
+    case EntryValueType.Number:
+        <input type="number" @bind="FilterValue"/>
+        break;
+    default:
+        <input @bind="FilterValue"/>
+        break;
+}
+
+<button class="btn-primary"
+        @onclick="ToggleApply">
+    @if (Filter.Applied)
+    {
+        <text>Disable</text>
+    }
+    else
+    {
+        <text>Apply</text>
+    }
+</button>
+
+
+@code {
+    /// <summary> <c>TransactionEntryFilter</c> which is manipulated through the component. </summary>
+    [Parameter] [EditorRequired] 
+    public TransactionEntryFilter Filter { get; set; } = default!;
+    
+    /// <summary> Optional alert component to display invalid input errors</summary>
+    [Parameter]
+    public AlertComponent? Alert { get; set; }
+
+    /// <summary>Caption</summary>
+    [Parameter]
+    public string Caption { get; set; } = "Filter";
+
+    /// <summary>Optional <c>Action</c> delegate called when filter is applied or disabled.</summary>
+    [Parameter]
+    public Action? OnApplyChange { get; set; }
+
+    private static readonly List<string> CompareSigns = new() {"<", "<=", "==","!=", ">=", ">", "REGEX"};
+
+    private void ToggleApply()
+    {
+        Filter.Applied = !Filter.Applied;
+        OnApplyChange?.Invoke();
+    }
+
+    private string? CompareSign
+    {
+        get => ComparisonToString(Filter.Comparison);
+        set
+        {
+            if (value != null)
+            {
+                Filter.Comparison = ComparisonFromString(value);
+            }
+        }
+    }
+    
+    private DateTime? FilterDateValue
+    {
+        get => DateTime.ParseExact(Filter.Reference.ValueString, TransactionEntryFilter.DateFormat, null);
+        set
+        {
+            if (value != null)
+            {
+                Filter.Reference.ValueString = ((DateTime) value).ToString(TransactionEntryFilter.DateFormat);
+            }
+        }
+    }
+
+    private string? FilterValue
+    {
+        get => Filter.Reference.ValueString;
+        set
+        {
+            if (value == null)
+            {
+                return;
+            }
+
+            if (Filter.Comparison == FilterComparison.Regex)
+            {
+                try
+                {
+                    Regex.Match("", value);
+                }
+                catch (ArgumentException)
+                {
+                    Alert?.DisplayAlertAsync($"{Caption}: invalid REGEX pattern", 7);
+                    return;
+                }
+            }
+
+            Filter.Reference.ValueString = value;
+        }
+    }
+
+    private string ComparisonToString(FilterComparison comparison)
+    {
+        return comparison switch
+        {
+            FilterComparison.Greater => ">",
+            FilterComparison.GreaterOrEqual => ">=",
+            FilterComparison.Equal => "==",
+            FilterComparison.NotEqual => "!=",
+            FilterComparison.LessOrEqual => "<-",
+            FilterComparison.Less => "<",
+            FilterComparison.Regex => "REGEX",
+            _ => throw new ArgumentOutOfRangeException(nameof(comparison), comparison, null)
+        };
+    }
+
+    private FilterComparison ComparisonFromString(string s)
+    {
+        return s switch
+        {
+            "<" => FilterComparison.Less,
+            "<=" => FilterComparison.LessOrEqual,
+            "==" => FilterComparison.Equal,
+            "!=" => FilterComparison.NotEqual,
+            ">=" => FilterComparison.GreaterOrEqual,
+            ">" => FilterComparison.Greater,
+            "REGEX" => FilterComparison.Regex,
+            _ => throw new ArgumentException(),
+        };
+    }
+
+}

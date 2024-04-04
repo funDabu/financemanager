@@ -1,0 +1,42 @@
+@rendermode InteractiveServer
+
+@if (_alert != null)
+{
+    <div class="alert alert-danger position-fixed top-10 start-50 translate-middle" role="alert" style="z-index: 1100">
+        @_alert
+    </div>
+}
+
+@code {
+    private string? _alert;
+    private int _alertCounter;
+    private readonly object _alertCounterLock = new object();
+    
+    /// <summary> Displays alert message for given number of seconds.</summary>
+    /// <param name="alert">Alert message</param>
+    /// <param name="seconds">Alert duration in seconds</param>
+    public async void DisplayAlertAsync(string alert, int seconds)
+    {
+        _alert = alert;
+        StateHasChanged();
+
+        int counter;
+        lock (_alertCounterLock)
+        {
+            counter = ++_alertCounter;
+        }
+
+        await Task.Delay(1000 * seconds);
+
+        lock (_alertCounterLock)
+        {
+            if (counter == _alertCounter)
+            {
+                _alert = null;
+                StateHasChanged();
+            }
+        }
+    }
+    
+    
+}

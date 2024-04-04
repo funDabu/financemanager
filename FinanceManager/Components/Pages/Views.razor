@@ -1,0 +1,36 @@
+@page "/views"
+@using FinanceManager.Services
+
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject ITransactionDataStorage DataStorage
+@inject IJSRuntime Js
+
+
+<h3>Views</h3>
+<ul>
+    @foreach (var (name, _) in DataStorage)           
+    {
+        <li>
+            <a href="/DataView/@name"> @name </a>
+            <button class="btn-primary" @onclick="() => DownloadFile(name)">Download</button>
+        </li>
+    }
+</ul>
+    @if (DataStorage.Count == 0)
+    {
+        <div>
+            No transaction data available. Please load new file.
+        </div>
+    }
+
+
+@code {
+    private async Task DownloadFile(string transactionData)
+    {
+        await using var fileStream = new TransactionDataParser()
+            .ToCsvStream((TransactionData)DataStorage.Get(transactionData));
+        using var streamRef = new DotNetStreamReference(stream: fileStream);
+        await Js.InvokeVoidAsync("downloadFileFromStream", transactionData, streamRef);
+    }
+
+}

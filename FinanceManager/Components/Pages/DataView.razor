@@ -1,0 +1,47 @@
+@page "/DataView/{DataId}"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using FinanceManager.Services
+@using FinanceManager.Components.Pages.Controls
+@inject ITransactionDataStorage DataStorage
+
+<h3> View of @DataId </h3>
+
+@if (Data != null)
+{
+    <DataGridComponent @ref="DataGrid" Data="Data"/>
+    <button class="btn-primary" @onclick="SaveChanges">Save Changes</button>
+}
+else
+{
+    <h3> Error </h3>
+    <div> Transaction with id: @DataId not found.</div>
+}
+
+@code {
+
+    [Parameter]
+    public string DataId { get; set; }
+
+    public ITransactionData? Data { get; set; }
+    
+    private DataGridComponent? DataGrid { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        Data = (ITransactionData?) DataStorage.Get(DataId)?.Clone();
+        StateHasChanged();
+    }
+
+    private void SaveChanges()
+    {
+        if (Data == null)
+        {
+            return;
+        }
+        var newData = (ITransactionData) Data.Clone();
+        DataStorage.Remove(DataId);
+        DataStorage.TryAdd(DataId, newData);
+    }
+
+}
